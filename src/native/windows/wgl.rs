@@ -407,27 +407,35 @@ impl Wgl {
         // CreateContextAttribsARB is supposed to create the context with
         // the highest version version possible
         // but, somehow, sometimes, it creates 2.1 context when 3.1 is in fact available
-        // so this is a workaround: try to create 3.1, and if it fails, go for 2.1
-        let attrs = [
-            WGL_CONTEXT_MAJOR_VERSION_ARB,
-            3,
-            WGL_CONTEXT_MINOR_VERSION_ARB,
-            1,
-            WGL_CONTEXT_FLAGS_ARB,
-            WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
-            WGL_CONTEXT_PROFILE_MASK_ARB,
-            WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
-            0,
-            0,
-        ];
-        let mut gl_ctx = self.CreateContextAttribsARB.unwrap()(
-            display.dc,
-            std::ptr::null_mut(),
-            attrs.as_ptr() as *const _,
-        );
+        // so this is a workaround: try the versions we want in turn, newest first: 3.3 core
+        // (GLSL 330: explicit output locations for MRT), then 3.1, then 2.1.
+        let mut gl_ctx = std::ptr::null_mut();
+        for (major, minor) in [(3, 3), (3, 1)] {
+            let attrs = [
+                WGL_CONTEXT_MAJOR_VERSION_ARB,
+                major,
+                WGL_CONTEXT_MINOR_VERSION_ARB,
+                minor,
+                WGL_CONTEXT_FLAGS_ARB,
+                WGL_CONTEXT_FORWARD_COMPATIBLE_BIT_ARB,
+                WGL_CONTEXT_PROFILE_MASK_ARB,
+                WGL_CONTEXT_CORE_PROFILE_BIT_ARB,
+                0,
+                0,
+            ];
+            gl_ctx = self.CreateContextAttribsARB.unwrap()(
+                display.dc,
+                std::ptr::null_mut(),
+                attrs.as_ptr() as *const _,
+            );
+            if !gl_ctx.is_null() {
+                break;
+            }
+            eprintln!("WGL: failed to create {major}.{minor} context");
+        }
 
         if gl_ctx.is_null() {
-            eprintln!("WGL: failed to create 3.1 context, trying 2.1");
+            eprintln!("WGL: trying 2.1");
 
             let attrs = [
                 WGL_CONTEXT_MAJOR_VERSION_ARB,
