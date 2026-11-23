@@ -1241,13 +1241,24 @@ pub trait RenderingBackend {
         if textures.len() == 0 {
             panic!("depth-only render pass");
         }
-        if textures.len() != 1 {
-            panic!("multiple render target render pass");
-        }
+        // A pass with several colour outputs gives the first: macroquad asks for its size.
         textures[0]
     }
     /// For depth-only render pass returns empty slice.
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId];
+    /// Re-attaches a render pass's framebuffer to new colour textures (one per draw buffer,
+    /// in order) and a new depth texture, e.g. a second colour output and a deeper depth
+    /// than a pass made by `new_render_pass` has. The pass takes ownership: its old
+    /// textures are deleted now, the new ones with the pass (`delete_render_pass`). OpenGL
+    /// only.
+    fn render_pass_set_attachments(
+        &mut self,
+        _render_pass: RenderPass,
+        _color_img: &[TextureId],
+        _depth_img: Option<TextureId>,
+    ) {
+        unimplemented!("render_pass_set_attachments: OpenGL only")
+    }
     fn delete_render_pass(&mut self, render_pass: RenderPass);
     fn new_pipeline(
         &mut self,

@@ -1156,6 +1156,52 @@ impl RenderingBackend for GlContext {
 
         RenderPass(self.passes.add(pass))
     }
+    fn render_pass_set_attachments(
+        &mut self,
+        render_pass: RenderPass,
+        color_img: &[TextureId],
+        depth_img: Option<TextureId>,
+    ) {
+        let gl_fb = self.passes[render_pass.0].gl_fb;
+        unsafe {
+            glBindFramebuffer(GL_FRAMEBUFFER, gl_fb);
+            for (i, img) in color_img.iter().enumerate() {
+                let raw = self.textures.get(*img).raw.texture().unwrap();
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0 + i as u32,
+                    GL_TEXTURE_2D,
+                    raw,
+                    0,
+                );
+            }
+            if let Some(img) = depth_img {
+                let raw = self.textures.get(img).raw.texture().unwrap();
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, raw, 0);
+            }
+            let attachments: Vec<u32> = (0..color_img.len() as u32)
+                .map(|i| GL_COLOR_ATTACHMENT0 + i)
+                .collect();
+            glDrawBuffers(attachments.len() as _, attachments.as_ptr() as _);
+            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+        }
+        let old = std::mem::replace(
+            &mut self.passes[render_pass.0].color_textures,
+            color_img.to_vec(),
+        );
+        for t in old {
+            if !color_img.contains(&t) {
+                self.delete_texture(t);
+            }
+        }
+        if let Some(img) = depth_img {
+            if let Some(old) = self.passes[render_pass.0].depth_texture.replace(img) {
+                if old != img {
+                    self.delete_texture(old);
+                }
+            }
+        }
+    }
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
         &self.passes[render_pass.0].color_textures
     }
