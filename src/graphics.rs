@@ -1318,6 +1318,14 @@ pub trait RenderingBackend {
     ) {
         unimplemented!("render_pass_set_attachments: OpenGL only")
     }
+    /// Which of a pass's own attachments are bound for drawing, the textures kept: the first
+    /// `colors` colour textures (draw buffers) and the depth texture or not; the rest come off the
+    /// framebuffer until a call puts them back (all of them: `colors` = their count, `depth`
+    /// true). So a pass can sample its own G-buffer textures without them being attached to
+    /// what it draws into (a feedback loop, undefined in GL). OpenGL only.
+    fn render_pass_draw_into(&mut self, _render_pass: RenderPass, _colors: usize, _depth: bool) {
+        unimplemented!("render_pass_draw_into: OpenGL only")
+    }
     fn delete_render_pass(&mut self, render_pass: RenderPass);
     fn new_pipeline(
         &mut self,

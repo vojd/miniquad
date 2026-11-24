@@ -1202,6 +1202,31 @@ impl RenderingBackend for GlContext {
             }
         }
     }
+    fn render_pass_draw_into(&mut self, render_pass: RenderPass, colors: usize, depth: bool) {
+        let pass = &self.passes[render_pass.0];
+        let raw = |t: TextureId| self.textures.get(t).raw.texture().unwrap();
+        unsafe {
+            glBindFramebuffer(GL_FRAMEBUFFER, pass.gl_fb);
+            for (i, img) in pass.color_textures.iter().enumerate() {
+                let tex = if i < colors { raw(*img) } else { 0 };
+                glFramebufferTexture2D(
+                    GL_FRAMEBUFFER,
+                    GL_COLOR_ATTACHMENT0 + i as u32,
+                    GL_TEXTURE_2D,
+                    tex,
+                    0,
+                );
+            }
+            if let Some(img) = pass.depth_texture {
+                let tex = if depth { raw(img) } else { 0 };
+                glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex, 0);
+            }
+            let n = colors.min(pass.color_textures.len()) as u32;
+            let attachments: Vec<u32> = (0..n).map(|i| GL_COLOR_ATTACHMENT0 + i).collect();
+            glDrawBuffers(attachments.len() as _, attachments.as_ptr() as _);
+            glBindFramebuffer(GL_FRAMEBUFFER, self.default_framebuffer);
+        }
+    }
     fn render_pass_color_attachments(&self, render_pass: RenderPass) -> &[TextureId] {
         &self.passes[render_pass.0].color_textures
     }
