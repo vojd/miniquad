@@ -669,6 +669,8 @@ pub unsafe fn is_gl2() -> bool {
 /// Whether the timer queries (`glQueryCounter`, `glGetQueryObjectui64v`) were loaded: core
 /// since GL 3.3 (ARB_timer_query).
 pub fn timer_queries_loaded() -> bool {
-    unsafe { (*core::ptr::addr_of!(__pfns::glQueryCounter)).is_some()
-        && (*core::ptr::addr_of!(__pfns::glGetQueryObjectui64v)).is_some() }
+    unsafe {
+        (*core::ptr::addr_of!(__pfns::glQueryCounter)).is_some()
+            && (*core::ptr::addr_of!(__pfns::glGetQueryObjectui64v)).is_some()
+    }
 }
