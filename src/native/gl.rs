@@ -244,6 +244,7 @@ pub const GL_TEXTURE_SWIZZLE_A: u32 = 36421;
 pub const GL_TEXTURE_SWIZZLE_RGBA: u32 = 36422;
 pub const GL_DRAW_FRAMEBUFFER_BINDING: u32 = 36006;
 pub const GL_TIME_ELAPSED: u32 = 35007;
+pub const GL_TIMESTAMP: u32 = 36392;
 pub const GL_QUERY_RESULT: u32 = 34918;
 pub const GL_QUERY_RESULT_AVAILABLE: u32 = 34919;
 pub const GL_VENDOR: u32 = 0x1F00;
@@ -646,6 +647,7 @@ gl_loader!(
     fn glGenQueries(n: GLsizei, ids: *mut GLuint) -> (),
     fn glGetQueryObjectiv(id: GLuint, pname: GLenum, params: *mut GLint) -> (),
     fn glGetQueryObjectui64v(id: GLuint, pname: GLenum, params: *mut GLuint64) -> (),
+    fn glQueryCounter(id: GLuint, target: GLenum) -> (),
     fn glFlush() -> (),
     fn glFinish() -> (),
     fn glPolygonMode(face: GLenum, mode: GLenum) -> ()
@@ -662,4 +664,11 @@ pub unsafe fn is_gl2() -> bool {
     version_string.is_empty()
         || version_string.starts_with("2")
         || version_string.starts_with("OpenGL ES 2")
+}
+
+/// Whether the timer queries (`glQueryCounter`, `glGetQueryObjectui64v`) were loaded: core
+/// since GL 3.3 (ARB_timer_query).
+pub fn timer_queries_loaded() -> bool {
+    unsafe { (*core::ptr::addr_of!(__pfns::glQueryCounter)).is_some()
+        && (*core::ptr::addr_of!(__pfns::glGetQueryObjectui64v)).is_some() }
 }

@@ -920,17 +920,15 @@ impl ElapsedQuery {
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn get_result(&self) -> u64 {
-        // let mut time: GLuint64 = 0;
-        // assert!(self.gl_query != 0);
-        // unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
-        // time
-        0
+        let mut time: GLuint64 = 0;
+        assert!(self.gl_query != 0);
+        unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
+        time
     }
 
     /// Reports whenever elapsed timer is supported and other methods can be invoked.
     pub fn is_supported() -> bool {
-        unimplemented!();
-        //unsafe { sapp_is_elapsed_timer_supported() }
+        timer_queries_supported()
     }
 
     /// Reports whenever result of submitted query is available for retrieval with
@@ -941,17 +939,7 @@ impl ElapsedQuery {
     ///
     /// Use [`ElapsedQuery::is_supported()`] to check if functionality is available and the method can be called.
     pub fn is_available(&self) -> bool {
-        // let mut available: GLint = 0;
-
-        // // begin_query was not called yet
-        // if self.gl_query == 0 {
-        //     return false;
-        // }
-
-        //unsafe { glGetQueryObjectiv(self.gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
-        //available != 0
-
-        false
+        query_available(self.gl_query)
     }
 
     /// Delete query.
@@ -961,6 +949,77 @@ impl ElapsedQuery {
     /// Implemented as `glDeleteQueries(...)` on OpenGL/WebGL platforms.
     pub fn delete(&mut self) {
         unsafe { glDeleteQueries(1, &self.gl_query) }
+        self.gl_query = 0;
+    }
+}
+
+/// Whether the GL timer queries ([`ElapsedQuery`], [`TimestampQuery`]) can be used: core since
+/// GL 3.3. Not on WebGL here.
+pub fn timer_queries_supported() -> bool {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        crate::native::gl::timer_queries_loaded()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        false
+    }
+}
+
+fn query_available(gl_query: GLuint) -> bool {
+    // Never recorded yet.
+    if gl_query == 0 {
+        return false;
+    }
+    let mut available: GLint = 0;
+    unsafe { glGetQueryObjectiv(gl_query, GL_QUERY_RESULT_AVAILABLE, &mut available) };
+    available != 0
+}
+
+/// The GPU's clock at a point in the command stream (`glQueryCounter(GL_TIMESTAMP)`), read back
+/// a few frames later. Unlike [`ElapsedQuery`] any number can be in flight at once, so one
+/// frame can be split into spans: the difference of two timestamps is the GPU time between them.
+///
+/// Recorded where the GL commands are issued: whatever is batched on the CPU side (a
+/// higher-level renderer's draw calls) must be flushed first to land inside the span.
+#[derive(Clone, Copy, Default)]
+pub struct TimestampQuery {
+    gl_query: GLuint,
+}
+
+impl TimestampQuery {
+    pub fn new() -> TimestampQuery {
+        TimestampQuery { gl_query: 0 }
+    }
+
+    /// Records the GPU's time once every command before it has finished. Re-recording a query
+    /// whose result wasn't read discards that result.
+    pub fn record(&mut self) {
+        if self.gl_query == 0 {
+            unsafe { glGenQueries(1, &mut self.gl_query) };
+        }
+        unsafe { glQueryCounter(self.gl_query, GL_TIMESTAMP) };
+    }
+
+    /// Whether the time recorded last can be read without stalling.
+    pub fn is_available(&self) -> bool {
+        query_available(self.gl_query)
+    }
+
+    /// The recorded time in nanoseconds (an arbitrary origin: only differences mean anything).
+    /// Waits for the GPU if it isn't available yet.
+    pub fn get_result(&self) -> u64 {
+        let mut time: GLuint64 = 0;
+        assert!(self.gl_query != 0);
+        unsafe { glGetQueryObjectui64v(self.gl_query, GL_QUERY_RESULT, &mut time) };
+        time
+    }
+
+    /// Not deleted when dropped.
+    pub fn delete(&mut self) {
+        if self.gl_query != 0 {
+            unsafe { glDeleteQueries(1, &self.gl_query) }
+        }
         self.gl_query = 0;
     }
 }
